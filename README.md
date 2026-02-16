@@ -957,3 +957,212 @@ public static void main(String[] args) throws ClassNotFoundException {
 
 ```
 
+
+## Lombok
+
+Lombok是一种插件化注解API，是通过添加注解来实现的，然后在javac进行编译的时候，进行处理。
+
+Java的编译过程可以分成三个阶段：
+
+1 所有源文件会被解析成语法树。
+2 调用注解处理器。如果注解处理器产生了新的源文件，新文件也要进行编译。
+3 最后，语法树会被分析并转化成类文件。
+
+所有源文件会被解析成语法树。
+调用注解处理器。如果注解处理器产生了新的源文件，新文件也要进行编译。
+最后，语法树会被分析并转化成类文件。
+
+
+## 使用Lombok
+我们通过实战来演示一下Lombok的实用注解：
+
+我们通过添加@Getter和@Setter来为当前类的所有字段生成get/set方法，他们可以添加到类或是字段上，注意静态字段不会生成，final字段无法生成set方法。
+我们还可以使用@Accessors来控制生成Getter和Setter的样式。
+我们通过添加@ToString来为当前类生成预设的toString方法。
+我们可以通过添加@EqualsAndHashCode来快速生成比较和哈希值方法。
+我们可以通过添加@AllArgsConstructor和@NoArgsConstructor来快速生成全参构造和无参构造。
+我们可以添加@RequiredArgsConstructor来快速生成参数只包含final或被标记为@NonNull的成员字段。
+使用@Data能代表@Setter、@Getter、@RequiredArgsConstructor、@ToString、@EqualsAndHashCode全部注解。
+一旦使用@Data就不建议此类有继承关系，因为equal方法可能不符合预期结果（尤其是仅比较子类属性）。
+使用@Value与@Data类似，但是并不会生成setter并且成员属性都是final的。
+使用@SneakyThrows来自动生成try-catch代码块。
+使用@Cleanup作用与局部变量，在最后自动调用其close()方法（可以自由更换）
+使用@Builder来快速生成建造者模式。
+通过使用@Builder.Default来指定默认值。
+通过使用@Builder.ObtainVia来指定默认值的获取方式。
+
+
+
+@Target- 标记这个注解应该是哪种 Java 成员。
+@Retention- 标识这个注解怎么保存，是只在代码中，还是编入class文件中，或者是在运行时可以通过反射访问。
+
+
+## Java label的写法
+
+```java
+label1:
+for (int i = 0; i < 10; i++) {
+    for (int j = 0; j < 10; j++) {
+        if (j == 1) break label1;
+    }
+}
+```
+
+---
+
+### 🔍 代码讲解
+
+1.  **标签（Label）的作用**
+    `label1:` 是一个**语句标签**，它标记了外层的 `for` 循环。在 Java 中，标签可以和 `break` 或 `continue` 配合使用，实现对多层循环的精确控制。
+
+2.  **`break label1;` 的含义**
+   - 普通的 `break;` 只会跳出当前最内层的循环（这里是 `j` 循环）。
+   - 带标签的 `break label1;` 会直接终止**标签所标记的整个外层循环**（这里是 `i` 循环），并从该循环之后的代码继续执行。
+
+3.  **这段代码的执行流程**
+   1.  外层循环 `i` 从 0 开始。
+   2.  进入内层循环 `j`，`j` 从 0 开始。
+   3.  当 `j == 1` 时，条件成立，执行 `break label1;`。
+   4.  程序直接跳出整个 `label1` 标记的外层循环，`i` 循环不再继续执行，程序结束。
+
+    所以，这段代码的实际执行结果是：
+   - `i` 只执行了一次（`i=0`）。
+   - `j` 执行了两次（`j=0` 和 `j=1`）。
+   - 当 `j=1` 时，直接终止了整个嵌套循环。
+
+---
+
+### 💡 延伸说明
+
+-   **`continue label;`**：与 `break` 类似，`continue` 也可以带标签。它会跳过当前循环的剩余部分，直接跳转到标签所标记的循环的下一次迭代。
+-   **使用场景**：这种带标签的 `break` 主要用于**多层嵌套循环**中，当需要从深层循环直接跳出到最外层时非常有用，可以避免使用复杂的布尔标志位。
+-   **注意事项**：虽然功能强大，但过度使用标签会降低代码的可读性，应谨慎使用。
+
+---
+
+
+你想了解 Lombok 中的 `@Builder` 注解，它是 Lombok 提供的一个非常实用的注解，
+主要用于快速实现“建造者模式”，让复杂对象的创建更简洁、可读性更高，我会从基础用法到进阶特性帮你讲清楚。
+
+### 一、`@Builder` 注解的核心作用
+`@Builder` 注解会为目标类自动生成**建造者模式**的相关代码，包括：
+- 一个静态的内部建造者类（如 `StudentBuilder`）；
+- 建造者类中对应实体类字段的 `setter` 方法（方法名与字段名一致）；
+- 建造者类的 `build()` 方法（用于最终创建实体类对象）；
+- 实体类的静态 `builder()` 方法（用于获取建造者对象）。
+
+简单来说，它可以把“繁琐的多参数构造器/多次 set 方法调用”，变成“链式调用”的优雅写法。
+
+### 二、基础使用示例
+以你之前的 `Student` 类为例，添加 `@Builder` 后的完整代码：
+```java
+package com.jdbc;
+
+import lombok.Builder;
+import lombok.Getter;
+import lombok.ToString;
+
+@Getter // 生成getter，方便查看属性
+@ToString // 生成toString，方便打印对象
+@Builder // 核心注解：启用建造者模式
+public class Student {
+    Integer sid;
+    String name;
+    String sex;
+
+    public void say(){
+        System.out.println("我叫："+name+"，学号为："+sid+"，我的性别是："+sex);
+    }
+}
+```
+
+#### 测试代码（创建 Student 对象）：
+```java
+package com.lombok;
+
+import com.jdbc.Student;
+
+public class Test {
+    public static void main(String[] args) {
+        // 使用@Builder生成的建造者模式创建对象（链式调用）
+        Student student = Student.builder()
+                .sid(15)       // 对应sid字段
+                .name("xyc")   // 对应name字段
+                .sex("nan")    // 对应sex字段
+                .build();      // 最终构建对象
+
+        // 测试
+        System.out.println(student); // 触发toString
+        student.say();
+    }
+}
+```
+
+#### 输出结果：
+```
+Student(sid=15, name=xyc, sex=nan)
+我叫：xyc，学号为：15，我的性别是：nan
+```
+
+### 三、关键特性与进阶用法
+#### 1. 与其他注解的配合
+- **`@AllArgsConstructor`/`@NoArgsConstructor`**：`@Builder` 会隐式生成一个全参构造器，但如果需要无参构造器，需手动添加 `@NoArgsConstructor`，且建议配合 `@Tolerate` 或 `@Builder.Default` 使用；
+- **`@Builder.Default`**：为字段设置默认值，创建对象时若不指定该字段，则使用默认值：
+  ```java
+  @Builder
+  @Getter
+  @ToString
+  public class Student {
+      Integer sid;
+      String name;
+      @Builder.Default // 设置默认值
+      String sex = "未知"; // 若不指定sex，默认值为"未知"
+  }
+
+  // 测试：不指定sex
+  Student student = Student.builder().sid(16).name("张三").build();
+  System.out.println(student); // 输出：Student(sid=16, name=张三, sex=未知)
+  ```
+
+#### 2. 手动定制建造者（可选）
+如果需要对建造者逻辑做定制（比如参数校验），可以手动编写建造者类，Lombok 会兼容：
+```java
+@Builder
+@Getter
+@ToString
+public class Student {
+    Integer sid;
+    String name;
+    String sex;
+
+    // 手动定制建造者的sid方法，添加参数校验
+    public static class StudentBuilder {
+        public StudentBuilder sid(Integer sid) {
+            if (sid <= 0) {
+                throw new IllegalArgumentException("学号不能小于等于0");
+            }
+            this.sid = sid;
+            return this; // 必须返回this，保证链式调用
+        }
+    }
+
+    public void say(){
+        System.out.println("我叫："+name+"，学号为："+sid+"，我的性别是："+sex);
+    }
+}
+
+// 测试：传入非法学号
+// Student student = Student.builder().sid(-1).name("李四").sex("男").build();
+// 会抛出：IllegalArgumentException: 学号不能小于等于0
+```
+
+#### 3. 注意事项
+- `@Builder` 生成的建造者模式是**不可变对象友好**的（无需 set 方法），适合创建一旦创建就不修改的对象；
+- 若实体类有父类，`@Builder` 默认不会处理父类字段，需手动扩展（或使用 `@SuperBuilder` 注解，支持父类字段）；
+- 必须保证 Lombok 环境正常（插件+依赖），否则注解无法生成代码，会报“找不到 builder() 方法”的错误。
+
+### 总结
+1. `@Builder` 是 Lombok 用于快速实现**建造者模式**的注解，核心优势是通过**链式调用**简化复杂对象的创建，提升代码可读性；
+2. 基础用法只需在类上添加 `@Builder`，即可通过 `类名.builder().字段名(值).build()` 创建对象；
+3. 进阶可通过 `@Builder.Default` 设置默认值、手动定制建造者方法做参数校验，配合 `@SuperBuilder` 支持父类字段。
+
