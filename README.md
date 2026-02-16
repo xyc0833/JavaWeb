@@ -753,3 +753,207 @@ dependencies {
 1. 最安全的方式是从 **MySQL 官方下载页面** 获取 zip 包，解压后得到 jar 包。
 2. 项目管理工具（Maven/Gradle）可直接引入依赖，无需手动下载，是开发中更高效的方式。
 3. IDEA 内置的数据库配置界面也能自动下载对应版本驱动，适合快速测试连接。
+
+
+## 了解一下   DriverManager
+
+我们可以手动为驱动管理器添加一个日志打印：
+
+static {
+DriverManager.setLogWriter(new PrintWriter(System.out));   //这里直接设定为控制台输出
+}
+
+PrintWriter 也是io流的一种
+
+你想了解的 `PrintWriter` 确实是 Java IO 体系中的一员，而且是处理字符输出的重要类，我会帮你把它的核心概念和用法讲清楚。
+
+### 一、`PrintWriter` 的定位与核心特性
+首先明确：`PrintWriter` 属于 **Java IO 中的字符输出流**，它是 `Writer` 抽象类的子类，专门用于以“人性化”的方式输出各种数据类型（字符串、数字、对象等），而非底层的字节/字符流操作。
+
+它的核心特点：
+1. **面向用户的输出**：提供了 `print()`、`println()`、`printf()` 等易用方法，支持直接输出字符串、int、double、对象等，无需手动转换为字符/字节。
+2. **自动刷新（可选）**：创建时可指定“自动刷新”参数，调用 `println()`/`printf()` 等方法时会自动刷新缓冲区，无需手动调用 `flush()`。
+3. **异常处理简化**：默认情况下不会抛出 IO 异常（需通过 `checkError()` 方法主动检查错误），降低新手使用门槛。
+4. **支持多种输出目标**：可以基于文件、字节流、字符流、字符串缓冲区等创建 `PrintWriter`。
+
+### 二、基础使用示例
+下面是几个常见的 `PrintWriter` 使用场景，帮你直观理解：
+
+#### 1. 输出到文件
+```java
+import java.io.File;
+import java.io.PrintWriter;
+import java.io.FileNotFoundException;
+
+public class PrintWriterDemo {
+    public static void main(String[] args) {
+        // 1. 创建 PrintWriter，指定输出到文件，第二个参数为 true 表示启用自动刷新
+        try (PrintWriter pw = new PrintWriter(new File("output.txt"), true)) {
+            // 2. 输出各种类型数据
+            pw.println("Hello PrintWriter"); // 输出字符串并换行
+            pw.print("整数：");              // 输出字符串不换行
+            pw.println(123);                // 输出整数并换行
+            pw.printf("浮点数：%.2f%n", 3.1415); // 格式化输出
+            pw.println(true);               // 输出布尔值
+            pw.println(new Object());       // 输出对象（调用 toString()）
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        // 注：使用 try-with-resources 语法，会自动关闭流，无需手动 close()
+    }
+}
+```
+
+#### 2. 输出到控制台（替代 System.out）
+`System.out` 本质上就是一个 `PrintStream`（字节流），而 `PrintWriter` 可以包装它实现字符流输出：
+```java
+import java.io.PrintWriter;
+
+public class PrintWriterConsole {
+    public static void main(String[] args) {
+        // 包装 System.out 为 PrintWriter，启用自动刷新
+        PrintWriter pw = new PrintWriter(System.out, true);
+        pw.println("通过 PrintWriter 输出到控制台");
+        pw.printf("姓名：%s，年龄：%d%n", "张三", 20);
+        pw.close(); // 关闭流（控制台流关闭后不影响程序，仅释放资源）
+    }
+}
+```
+
+### 三、关键注意点
+1. **字符流 vs 字节流**：`PrintWriter` 是字符流，处理的是字符（默认按系统编码），而 `PrintStream`（如 System.out）是字节流；如果需要处理二进制数据（如图片、视频），用字节流（`FileOutputStream`），文本数据优先用 `PrintWriter`。
+2. **异常检查**：`PrintWriter` 默认不抛 IO 异常，若需检查错误，可调用 `pw.checkError()`（返回 true 表示有错误）：
+   ```java
+   if (pw.checkError()) {
+       System.err.println("输出过程中出现错误");
+   }
+   ```
+3. **缓冲区**：若未启用自动刷新，需手动调用 `pw.flush()` 才能将缓冲区内容写入目标（如文件）。
+
+### 总结
+1. `PrintWriter` 是 Java IO 中的**字符输出流**，属于 `Writer` 子类，专注于便捷的文本输出。
+2. 核心优势是提供 `print()`/`println()`/`printf()` 方法，支持多类型数据输出，可指定自动刷新，异常处理更简单。
+3. 适用于文本文件写入、控制台输出等场景，二进制数据输出需用字节流（如 `FileOutputStream`）。
+
+
+## 了解Connection
+Connection是数据库的连接对象，可以通过连接对象来创建一个Statement用于执行SQL语句：
+
+Statement createStatement() throws SQLException;
+
+//3. 执行SQL语句，并得到结果集
+ResultSet set = statement.executeQuery("select * from user");
+
+
+## 了解Statement
+我们发现，我们之前使用了executeQuery()方法来执行select语句，
+此方法返回给我们一个ResultSet对象，查询得到的数据，就存放在ResultSet中！
+
+Statement除了执行这样的DQL语句外，我们还可以使用executeUpdate()方法来执行一个DML或是DDL语句，
+它会返回一个int类型，表示执行后受影响的行数，可以通过它来判断DML语句是否执行成功。
+
+也可以通过excute()来执行任意的SQL语句，
+它会返回一个boolean来表示执行结果是一个ResultSet还是一个int，
+我们可以通过使用getResultSet()或是getUpdateCount()来获取。
+
+
+
+-- 先创建架构（数据库），若已存在则跳过
+CREATE DATABASE IF NOT EXISTS sql_hr;
+USE sql_hr; -- 切换到 sql_hr 架构
+
+-- 创建学生表
+CREATE TABLE IF NOT EXISTS student (
+sid INT PRIMARY KEY COMMENT '学号（主键）',
+name VARCHAR(50) NOT NULL COMMENT '学生姓名',
+sex VARCHAR(10) NOT NULL COMMENT '学生性别'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT '学生信息表';
+
+-- 插入 5 条测试数据
+INSERT INTO student (sid, name, sex) VALUES
+(1001, '张三', '男'),
+(1002, '李四', '女'),
+(1003, '王五', '男'),
+(1004, '赵六', '女'),
+(1005, '钱七', '男');
+
+-- 查询验证
+SELECT * FROM student;
+
+https://www.itbaima.cn/zh-CN/document/xgbeasmvrhxx9tn4?segment=1#%E6%89%A7%E8%A1%8CDML%E6%93%8D%E4%BD%9C
+
+## 使用PreparedStatement
+
+我们发现，如果单纯地使用Statement来执行SQL命令，会存在严重的SQL注入攻击漏洞！
+而这种问题，我们可以使用PreparedStatement来解决：
+```java
+public static void main(String[] args) throws ClassNotFoundException {
+    try (Connection connection = DriverManager.getConnection("URL","用户名","密码");
+         PreparedStatement statement = connection.prepareStatement("select * from user where username= ? and pwd=?;");
+         Scanner scanner = new Scanner(System.in)){
+
+        statement.setString(1, scanner.nextLine());
+        statement.setString(2, scanner.nextLine());
+        System.out.println(statement);    //打印查看一下最终执行的
+        ResultSet res = statement.executeQuery();
+        while (res.next()){
+            String username = res.getString(1);
+            System.out.println(username+" 登陆成功！");
+        }
+    }catch (SQLException e){
+        e.printStackTrace();
+    }
+}
+
+```
+
+我们发现，我们需要提前给到PreparedStatement一个SQL语句，并且使用?作为占位符，
+它会预编译一个SQL语句，通过直接将我们的内容进行替换的方式来填写数据。
+使用这种方式，我们之前的例子就失效了！我们来看看实际执行的SQL语句是什么：
+com.mysql.cj.jdbc.ClientPreparedStatement: select * from user where username= 'Test' and pwd='123456'' or 1=1; -- ';
+
+我们发现，我们输入的参数一旦出现'时，会被变为转义形式\'，而最外层有一个真正的'来将我们输入的内容进行包裹，因此它能够有效地防止SQL注入攻击！
+
+## 管理事务
+
+JDBC默认的事务处理行为是自动提交，所以前面我们执行一个SQL语句就会被直接提交
+（相当于没有启动事务），所以JDBC需要进行事务管理时，
+首先要通过Connection对象调用setAutoCommit(false) 方法, 
+将SQL语句的提交（commit）由驱动程序转交给应用程序负责。
+
+```sql
+-- 创建 user 表（若不存在则创建）
+CREATE TABLE IF NOT EXISTS user (
+    -- 第一个字段：字符串类型，命名为 username，作为主键（保证唯一）
+    username VARCHAR(50) PRIMARY KEY COMMENT '用户名（主键）',
+    -- 第二个字段：整数类型，命名为 password（或 num，根据业务调整），非空约束
+    password INT NOT NULL COMMENT '密码（数字格式）'
+) COMMENT '用户信息表';
+
+```
+
+同样的，我们也可以去创建一个回滚点来实现定点回滚：
+ ```java
+public static void main(String[] args) throws ClassNotFoundException {
+    try (Connection connection = DriverManager.getConnection("URL","用户名","密码");
+         Statement statement = connection.createStatement()){
+
+        connection.setAutoCommit(false);  //关闭自动提交，现在将变为我们手动提交
+        statement.executeUpdate("insert into user values ('a', 1234)");
+        
+        Savepoint savepoint = connection.setSavepoint();   //创建回滚点
+        statement.executeUpdate("insert into user values ('b', 1234)");
+
+        connection.rollback(savepoint);   //回滚到回滚点，撤销前面全部操作
+
+        statement.executeUpdate("insert into user values ('c', 1234)");
+
+        connection.commit();   //提交事务（注意，回滚之前的内容都没了）
+
+    }catch (SQLException e){
+        e.printStackTrace();
+    }
+}
+
+```
+
