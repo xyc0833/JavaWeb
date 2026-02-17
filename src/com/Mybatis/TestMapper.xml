@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.Mybatis.TestMapper">
+    <select id="selectStudent" resultType="com.jdbc.Student">
+        select * from student
+    </select>
+
+    <select id="getStudentBySid"  resultType="com.jdbc.Student">
+        select * from student where sid = #{sid}
+    </select>
+
+    <insert id="addStudent" parameterType="com.jdbc.Student">
+        insert into student(sid,name,sex) values(#{sid},#{name}, #{sex})
+    </insert>
+
+    <delete id = "deleteStudent">
+        delete from student where sid = #{sid}
+    </delete>
+
+    <select id="getTeacherByTid" resultMap="asTeacher">
+        select *, teacher.name as tname from student inner join teach on student.sid = teach.sid
+                                                     inner join teacher on teach.tid = teacher.tid where teach.tid = #{tid}
+    </select>
+    <!--    映射为Teacher对象时，同时将其教授的所有学生一并映射为List列表
+    使用resultMap来自定义映射规则-->
+    <resultMap id="asTeacher" type="com.jdbc.Teacher">
+        <!--id标签用于在多条记录中辨别是否为同一个对象的数据-->
+        <id column="tid" property="tid"/>
+        <result column="tname" property="name"/>
+        <!--通过使用collection来表示将得到的所有结果合并为一个集合，
+        比如上面的数据中每个学生都有单独的一条记录，
+        因此tid相同的全部学生的记录就可以最后合并为一个List-->
+        <collection property="studentList" ofType="com.jdbc.Student">
+            <id property="sid" column="sid"/>
+            <result column="name" property="name"/>
+            <result column="sex" property="sex"/>
+        </collection>
+    </resultMap>
+    <!--通过使用association进行关联，形成多对一的关系，
+    实际上和一对多是同理的，都是对查询结果的一种处理方式罢了。-->
+
+
+</mapper>
