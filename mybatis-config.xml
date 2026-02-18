@@ -15,7 +15,10 @@
         </environment>
     </environments>
     <mappers>
-        <mapper resource="com/Mybatis/TestMapper.xml"/>
+<!--        <mapper resource="com/Mybatis/TestMapper.xml"/>-->
         <!--    这里用的是url，也可以使用其他类型，我们会在后面讲解    -->
+        <!--改用注解-->
+        <mapper class="com.Mybatis.TestMapper"/>
+        <!--  也可以直接注册整个包下的 <package name="com.test.mapper"/>  -->
     </mappers>
 </configuration>

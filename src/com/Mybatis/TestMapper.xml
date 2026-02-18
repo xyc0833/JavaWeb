@@ -11,9 +11,9 @@
         select * from student where sid = #{sid}
     </select>
 
-    <insert id="addStudent" parameterType="com.jdbc.Student">
-        insert into student(sid,name,sex) values(#{sid},#{name}, #{sex})
-    </insert>
+<!--    <insert id="addStudent" parameterType="com.jdbc.Student">-->
+<!--        insert into student(sid,name,sex) values(#{sid},#{name}, #{sex})-->
+<!--    </insert>-->
 
     <delete id = "deleteStudent">
         delete from student where sid = #{sid}
@@ -40,6 +40,15 @@
     </resultMap>
     <!--通过使用association进行关联，形成多对一的关系，
     实际上和一对多是同理的，都是对查询结果的一种处理方式罢了。-->
-
+    <!--开启二级缓存-->
+    <cache
+            eviction="FIFO"
+            flushInterval="60000"
+            size="512"
+            readOnly="true"/>
+    <!--eviction：缓存淘汰策略 先进先出
+        flushInterval="60000"：缓存自动刷新间隔 这里 60000 = 60 秒
+        size="512"：缓存最大容量
+        readOnly="true"：缓存数据是否只读-->
 
 </mapper>

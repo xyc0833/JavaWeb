@@ -1122,7 +1122,8 @@ Student(sid=15, name=xyc, sex=nan)
   // 测试：不指定sex
   Student student = Student.builder().sid(16).name("张三").build();
   System.out.println(student); // 输出：Student(sid=16, name=张三, sex=未知)
-  ```
+  
+```
 
 #### 2. 手动定制建造者（可选）
 如果需要对建造者逻辑做定制（比如参数校验），可以手动编写建造者类，Lombok 会兼容：
@@ -1165,4 +1166,431 @@ public class Student {
 1. `@Builder` 是 Lombok 用于快速实现**建造者模式**的注解，核心优势是通过**链式调用**简化复杂对象的创建，提升代码可读性；
 2. 基础用法只需在类上添加 `@Builder`，即可通过 `类名.builder().字段名(值).build()` 创建对象；
 3. 进阶可通过 `@Builder.Default` 设置默认值、手动定制建造者方法做参数校验，配合 `@SuperBuilder` 支持父类字段。
+
+## XML相关
+
+java中如何解析xml文件
+
+```java
+// 创建DocumentBuilderFactory对象
+DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+// 创建DocumentBuilder对象
+//try {
+    DocumentBuilder builder = factory.newDocumentBuilder();
+    Document d = builder.parse("file:mappers/test.xml");
+    // 每一个标签都作为一个节点
+    NodeList nodeList = d.getElementsByTagName("test");  // 可能有很多个名字为test的标签
+    Node rootNode = nodeList.item(0); // 获取首个
+
+    NodeList childNodes = rootNode.getChildNodes(); // 一个节点下可能会有很多个节点，比如根节点下就囊括了所有的节点
+    //节点可以是一个带有内容的标签（它内部就还有子节点），也可以是一段文本内容
+
+//    for (int i = 0; i < childNodes.getLength(); i++) {
+//        Node child = childNodes.item(i);
+//        if(child.getNodeType() == Node.ELEMENT_NODE)  //过滤换行符之类的内容，因为它们都被认为是一个文本节点
+//        System.out.println(child.getNodeName() + "：" +child.getFirstChild().getNodeValue());
+//        // 输出节点名称，也就是标签名称，以及标签内部的文本（内部的内容都是子节点，所以要获取内部的节点）
+//    }
+//} catch (Exception e) {
+//    e.printStackTrace();
+//}
+
+```
+
+当然，学习和使用XML只是为了更好地去认识Mybatis的工作原理，
+以及如何使用XML来作为Mybatis的配置文件，这是在开始之前必须要掌握的内容
+（使用Java读取XML内容不要求掌握，但是需要知道Mybatis就是通过这种方式来读取配置文件的）
+
+## mybatis 绑定接口
+
+你现在是想搞懂 MyBatis 为什么要绑定接口、接口到底能带来什么便利，还想复习下接口的核心特性，我会用“大白话+对比案例”的方式讲清楚，保证你能听懂。
+
+### 一、先解决核心疑问：为什么 MyBatis 绑定接口会更方便？
+先对比两种写法，你就能直观感受到“方便”在哪：
+
+#### ❶ 之前的写法（麻烦版）
+你需要记住：
+- 映射器 XML 里的操作名称（比如 `"selectStudent"`）；
+- 这个操作的返回类型（比如 `List<Student>`）；
+- 还要手动用 `SqlSession` 调用 `selectList/insert/update` 等方法，写错名称或返回类型匹配错，只有运行时才会报错。
+```java
+// 旧写法：靠字符串找操作，靠自己记返回类型
+List<Student> students = sqlSession.selectList("selectStudent");
+```
+
+#### ❷ 绑定接口的写法（方便版）
+把映射器的 `namespace` 绑定到一个接口上，接口里的方法名、返回值直接对应 XML 里的操作，MyBatis 会自动实现这个接口的逻辑。你只用调用接口方法，不用记字符串、不用操心底层怎么执行：
+```java
+// 新写法：调用接口方法，像调用普通Java方法一样
+StudentMapper mapper = sqlSession.getMapper(StudentMapper.class);
+List<Student> students = mapper.selectStudent(); // 方法名就是操作名，返回值编译器直接检查
+```
+核心便利点：
+- 不用记字符串（靠接口方法名），写错方法名编译器直接提示（不用等运行报错）；
+- 方法返回值提前定义，不用手动匹配（比如返回 `List<Student>` 还是 `Student`，接口写死，不会错）；
+- 代码更像“普通Java开发”，不用和 `SqlSession` 的 `selectList/insert` 等方法耦合。
+
+### 二、复习接口的核心特性（通俗版）
+接口（`interface`）是 Java 里的“约定/规则”，只定义“要做什么”，不定义“怎么做”——这正好适配 MyBatis 的需求：我们只需要在接口里定义“查学生、新增学生”等行为，具体怎么查、怎么新增（SQL 逻辑）交给 MyBatis 去实现。
+
+#### 接口的核心特性（5个关键，结合 MyBatis 例子讲）
+##### 1. 接口只定义方法签名，没有方法体
+接口里的方法只有“名字、参数、返回值”，没有 `{}` 里的执行逻辑——MyBatis 正是利用这一点，帮我们把 XML 里的 SQL 逻辑“填”进这些方法里。
+```java
+// 学生映射器接口：只定义规则，不写实现
+public interface StudentMapper {
+    // 方法签名：返回List<Student>，方法名selectStudent，无参数
+    List<Student> selectStudent(); 
+    // 新增方法：参数是Student，返回int（影响行数）
+    int addStudent(Student student);
+}
+```
+
+##### 2. 接口不能直接实例化，只能由“实现类”完成逻辑
+你不能写 `new StudentMapper()`，因为接口没有方法体；但 MyBatis 会在运行时动态生成一个“实现类”（你看不到源码），这个实现类里的方法会去执行 XML 里的 SQL——这就是 `sqlSession.getMapper(StudentMapper.class)` 做的事：获取 MyBatis 帮你生成的实现类对象。
+
+##### 3. 接口是“强类型”的，编译器会帮你检查错误
+这是对比旧写法最大的优势：
+- 旧写法用字符串 `"selectStudent"`，如果写错成 `"selectStu"`，只有运行时才会报“找不到该操作”；
+- 新写法调用 `mapper.selectStu()`（写错方法名），编译器直接标红，不用等运行才发现错。
+
+##### 4. 接口可以和 XML/注解绑定（MyBatis 专属用法）
+MyBatis 靠 `namespace` 把接口和 XML 关联起来：
+```xml
+<!-- StudentMapper.xml 里的namespace必须等于接口的全类名 -->
+<mapper namespace="com.mapper.StudentMapper">
+    <!-- id必须等于接口里的方法名，resultType对应方法返回值的类型 -->
+    <select id="selectStudent" resultType="com.entity.Student">
+        SELECT sid, name, sex FROM student
+    </select>
+</mapper>
+```
+相当于告诉 MyBatis：`StudentMapper` 接口里的 `selectStudent()` 方法，对应执行这段 SQL。
+
+##### 5. 接口的方法可以有参数（适配 SQL 的参数）
+比如接口定义 `Student selectStudentById(Integer sid);`，XML 里就能用 `#{sid}` 接收参数，MyBatis 会自动把接口方法的参数传给 SQL，不用手动处理参数绑定。
+
+### 三、完整案例（接口绑定的完整流程）
+#### 步骤1：定义接口
+```java
+package com.mapper;
+import com.entity.Student;
+import java.util.List;
+
+public interface StudentMapper {
+    // 查所有学生
+    List<Student> selectStudent();
+    // 按学号查单个学生
+    Student selectStudentById(Integer sid);
+}
+```
+
+#### 步骤2：写 XML 映射器（绑定接口）
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- namespace = 接口全类名 -->
+<mapper namespace="com.mapper.StudentMapper">
+    <!-- id = 接口方法名，resultType = 方法返回值类型 -->
+    <select id="selectStudent" resultType="com.entity.Student">
+        SELECT sid, name, sex FROM sql_hr.student
+    </select>
+
+    <select id="selectStudentById" resultType="com.entity.Student">
+        SELECT sid, name, sex FROM sql_hr.student WHERE sid = #{sid}
+    </select>
+</mapper>
+```
+
+#### 步骤3：调用接口方法（最终使用）
+```java
+public static void main(String[] args) throws FileNotFoundException {
+    SqlSessionFactory factory = new SqlSessionFactoryBuilder()
+            .build(new FileInputStream("mybatis-config.xml"));
+    
+    try (SqlSession session = factory.openSession(true)) {
+        // 1. 获取MyBatis生成的接口实现类对象
+        StudentMapper mapper = session.getMapper(StudentMapper.class);
+        
+        // 2. 像调用普通方法一样使用，不用记字符串、不用管返回类型匹配
+        List<Student> all = mapper.selectStudent();
+        Student one = mapper.selectStudentById(1001);
+        
+        all.forEach(System.out::println);
+        System.out.println(one);
+    }
+}
+```
+
+### 总结
+1. MyBatis 绑定接口的核心便利：用“强类型的接口方法”替代“字符串操作名”，编译器提前检查错误，代码更简洁、不易错；
+2. 接口的核心特性：只定义“做什么”（方法签名），不定义“怎么做”（方法体），MyBatis 动态生成实现类，把 SQL 逻辑和接口方法绑定；
+3. 关键匹配规则：XML 的 `namespace` = 接口全类名，XML 的 `id` = 接口方法名，返回类型对应接口方法的返回值。
+
+这样写的好处就是：你只用关注“我要调用哪个方法查数据”，不用操心 MyBatis 底层怎么执行 SQL、怎么映射结果——所有底层逻辑都由 MyBatis 
+帮你完成，这就是接口带来的“便利”。
+
+
+## mapper相关
+
+#{xxx} 能防 SQL 注入，核心是它采用了 PreparedStatement（预编译语句） 机制
+
+但是如果使用${xxx}就不再是通过预编译，而是直接传值
+
+## @Accessors(chain = true)
+
+你想了解 Lombok 的 `@Accessors(chain = true)` 注解，它是用来改造 Lombok 生成的 `setter` 方法，让 `setter` 支持**链式调用**，让对象赋值的代码更简洁、可读性更高，我会用通俗的例子和对比帮你彻底理解。
+
+### 一、核心作用
+`@Accessors(chain = true)` 翻译过来就是“访问器（setter/getter）链式调用”，核心是修改 Lombok 生成的 `setter` 方法的返回值：
+- 普通 `setter` 方法返回 `void`，调用后不能继续链式操作；
+- 加了 `chain = true` 的 `setter` 方法返回当前对象（`this`），可以连续调用多个 `setter`。
+
+### 二、对比示例（最直观）
+还是以你熟悉的 `Student` 类为例，对比有无该注解的区别：
+
+#### ❶ 不加 `@Accessors(chain = true)`（默认情况）
+```java
+package com.jdbc;
+
+import lombok.Setter;
+import lombok.Getter;
+
+@Setter // 生成默认setter，返回void
+@Getter
+public class Student {
+    Integer sid;
+    String name;
+    String sex;
+}
+
+// 使用时：只能逐个调用setter，代码冗余
+public class Test {
+    public static void main(String[] args) {
+        Student student = new Student();
+        student.setSid(1001); // 返回void，不能继续点
+        student.setName("张三");
+        student.setSex("男");
+    }
+}
+```
+
+#### ❷ 加 `@Accessors(chain = true)`（链式调用）
+```java
+package com.jdbc;
+
+import lombok.Setter;
+import lombok.Getter;
+import lombok.experimental.Accessors;
+
+@Setter
+@Getter
+@Accessors(chain = true) // 核心注解：开启setter链式调用
+public class Student {
+    Integer sid;
+    String name;
+    String sex;
+}
+
+// 使用时：可以连续调用setter，代码简洁
+public class Test {
+    public static void main(String[] args) {
+        Student student = new Student()
+                .setSid(1001)   // 返回student对象，可继续点
+                .setName("张三") // 继续返回student对象
+                .setSex("男");   // 最终还是返回student对象
+    }
+}
+```
+
+### 三、`@Accessors` 的其他常用参数（拓展）
+除了 `chain = true`，`@Accessors` 还有两个实用参数，常和 `chain` 配合使用：
+
+#### 1. `fluent = true`：简化 setter/getter 方法名
+- 效果：生成的 `setter`/`getter` 去掉 `set`/`get` 前缀，直接用字段名作为方法名；
+- 结合 `chain = true` 时，链式调用更简洁：
+```java
+@Setter
+@Getter
+@Accessors(chain = true, fluent = true)
+public class Student {
+    Integer sid;
+    String name;
+    String sex;
+}
+
+// 使用：去掉set前缀，直接调用字段名
+Student student = new Student()
+        .sid(1001)   // 等价于原来的setSid(1001)
+        .name("张三") // 等价于原来的setName("张三")
+        .sex("男");
+```
+
+#### 2. `prefix = "xxx"`：忽略字段前缀
+如果你的字段有统一前缀（比如 `mSid`、`mName`），可以用 `prefix` 忽略前缀，生成更简洁的方法名：
+```java
+@Setter
+@Getter
+@Accessors(chain = true, prefix = "m") // 忽略前缀"m"
+public class Student {
+    Integer mSid; // 前缀m
+    String mName; // 前缀m
+    String mSex;  // 前缀m
+}
+
+// 使用：方法名还是sid/name/sex，不用带m
+Student student = new Student()
+        .setSid(1001) // 对应mSid字段
+        .setName("张三"); // 对应mName字段
+```
+
+### 四、关键注意事项
+1. **兼容性**：`@Accessors` 是 Lombok 的“实验性注解”（`experimental` 包下），但实际开发中使用非常广泛，无需担心稳定性；
+2. **和 `@Builder` 的区别**：
+   - `@Accessors(chain = true)` 是改造 `setter`，适合“先创建对象、后赋值”的场景；
+   - `@Builder` 是建造者模式，适合“创建对象时一次性赋值”的场景；
+   - 两者可以共存，但通常二选一即可（避免代码冗余）；
+3. **Lombok 环境要求**：和其他 Lombok 注解一样，需确保 IDE 安装了 Lombok 插件、项目引入了 Lombok 依赖，否则注解不生效。
+
+### 五、实战场景（结合 MyBatis）
+在 MyBatis 开发中，链式调用非常适合给实体类赋值（比如接收前端参数、组装查询条件）：
+```java
+// 场景：更新学生信息
+Student student = new Student()
+        .setSid(1001)
+        .setName("张三更新")
+        .setSex("男");
+// 调用Mapper接口更新
+testMapper.updateStudent(student);
+```
+
+### 总结
+1. `@Accessors(chain = true)` 核心作用是让 Lombok 生成的 `setter` 方法返回 `this`，支持**链式调用**，简化对象赋值代码；
+2. 常用拓展参数：`fluent = true` 简化方法名（去掉 set/get），`prefix = "xxx"` 忽略字段前缀；
+3. 适用场景：对象需要多次赋值时（如接收参数、组装数据），比逐个调用 `setter` 更优雅。
+
+
+-- 在 sql_hr 架构下创建 teach 中间表，用于关联学生和教师
+CREATE TABLE IF NOT EXISTS sql_hr.teach (
+sid INT NOT NULL COMMENT '学生ID',
+tid INT NOT NULL COMMENT '教师ID',
+PRIMARY KEY (sid, tid), -- 联合主键，保证一个学生不能被同一个教师重复关联
+FOREIGN KEY (sid) REFERENCES sql_hr.student(sid), -- 外键关联学生表
+FOREIGN KEY (tid) REFERENCES sql_hr.teacher(tid)  -- 外键关联教师表
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT '学生-教师授课关系表';
+
+
+-- 在 sql_hr 架构下创建 teacher 表
+CREATE TABLE IF NOT EXISTS sql_hr.teacher (
+tid INT PRIMARY KEY COMMENT '教师ID（主键）',
+name VARCHAR(50) NOT NULL COMMENT '教师姓名'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT '教师信息表';
+
+
+collection标签把多个对象映射为一个属性   
+association标签映射一个对象为一个属性   
+
+
+## 动态SQL
+动态 SQL 是 MyBatis 的强大特性之一。
+如果你使用过 JDBC 或其它类似的框架，
+你应该能理解根据不同条件拼接 SQL 语句有多痛苦，
+例如拼接时要确保不能忘记添加必要的空格，
+还要注意去掉列表最后一个列名的逗号。利用动态 SQL，可以彻底摆脱这种痛苦。
+
+我们直接使用官网的例子进行讲解。
+
+
+## mybatis 二级缓存淘汰策略
+
+你想了解 MyBatis 中这段二级缓存配置里每个属性的含义，我会用通俗易懂的语言拆解每个参数，同时说明它们的作用和实际使用场景，让你彻底理解二级缓存的配置逻辑。
+
+### 一、先明确核心前提
+`<cache>` 标签是 MyBatis 为**当前 Mapper 命名空间**开启二级缓存的核心配置——二级缓存是跨 SqlSession 的缓存（一级缓存是 SqlSession 内的缓存），多个 SqlSession 可以共享该 Mapper 的缓存数据，目的是减少数据库查询次数。
+
+### 二、逐个解析属性含义
+```xml
+<cache
+    eviction="FIFO"
+    flushInterval="60000"
+    size="512"
+    readOnly="true"/>
+```
+
+#### 1. `eviction="FIFO"`：缓存淘汰策略
+- **含义**：指定当缓存容量达到上限时，淘汰数据的规则（`FIFO` = 先进先出）。
+- **通俗解释**：把缓存想象成一个“储物柜”，容量满了之后，先放进去的数据会被先拿出来扔掉，给新数据腾位置。
+- **可选值（MyBatis 内置4种）**：
+  | 策略       | 含义                     | 适用场景                     |
+  |------------|--------------------------|------------------------------|
+  | `FIFO`     | 先进先出                 | 数据按顺序访问、无需保留热点数据 |
+  | `LRU`      | 最近最少使用（默认）| 大部分业务场景（优先保留常用数据） |
+  | `SOFT`     | 软引用（内存不足时淘汰） | 内存敏感场景（如移动端/低内存服务器） |
+  | `WEAK`     | 弱引用（垃圾回收时淘汰） | 数据时效性极强的场景         |
+
+#### 2. `flushInterval="60000"`：缓存自动刷新间隔
+- **含义**：缓存的自动清空时间，单位是**毫秒**（这里 60000 = 60秒）。
+- **通俗解释**：设置一个“定时清理”规则，每隔60秒，MyBatis 会自动清空当前 Mapper 的二级缓存，避免缓存数据过期。
+- **注意**：
+   - 该参数是**可选的**，不配置则不会自动刷新，缓存只会在执行 `insert/update/delete` 时手动刷新；
+   - 数值越大，缓存有效期越长（性能越好，但数据一致性越差）；数值越小，数据越新（但缓存命中率低，性能差）。
+
+#### 3. `size="512"`：缓存最大容量
+- **含义**：缓存最多能存储的“缓存项”数量（这里 512 表示最多存 512 个查询结果）。
+- **通俗解释**：给“储物柜”设定最大容量，最多放 512 个查询结果，超过后触发 `eviction` 配置的淘汰策略。
+- **注意**：
+   - 单位是“缓存项”（通常是一条 SQL 查询的结果，比如一个 `List<Student>` 算一个缓存项），不是“行数”；
+   - 数值不宜过大（比如设成 10000），否则会占用过多内存，反而降低性能，一般设 100~1024 即可。
+
+#### 4. `readOnly="true"`：缓存数据是否只读
+- **含义**：指定缓存的对象是否为“只读”（`true` = 只读，`false` = 可读写）。
+- **核心区别（关键）**：
+  | 值      | 含义                                                                 | 性能 | 安全性                     |
+  |---------|----------------------------------------------------------------------|------|----------------------------|
+  | `true`  | 缓存的是对象的“只读副本”（直接返回对象引用），不能修改缓存对象       | 高   | 安全（避免修改缓存数据）|
+  | `false` | 缓存的是对象的“可写副本”（返回对象的序列化拷贝），可以修改缓存对象   | 低   | 需注意：修改副本不影响数据库 |
+- **使用建议**：
+  日常业务中优先设为 `true`——因为缓存的核心作用是“查询”，修改数据应通过 `update` 操作，而非直接改缓存对象，`true` 既保证性能又避免误改缓存。
+
+### 三、配置的整体效果
+你这段配置的完整作用是：
+> 为当前 Mapper 开启二级缓存，缓存最多存 512 个查询结果；当容量满时，按“先进先出”淘汰旧数据；每隔 60 秒自动清空缓存；缓存数据为只读副本，性能优先且数据安全。
+
+### 四、使用二级缓存的注意事项
+1. **只适用于“读多写少”的场景**：比如查询教师/学生基础信息（很少修改），如果是频繁插入/更新的表（如订单表），开启二级缓存会导致数据不一致，反而适得其反；
+2. **关联查询需注意**：如果你的 Mapper 有跨表关联查询（比如学生+教师），需确保关联的表也开启二级缓存，或通过 `cache-ref` 共享缓存；
+3. **实体类需序列化**：如果 `readOnly="false"`，缓存的对象（如 `Teacher`/`Student`）必须实现 `Serializable` 接口（否则序列化拷贝会报错）；
+4. **手动刷新缓存**：执行 `insert/update/delete` 时，MyBatis 会自动清空当前 Mapper 的二级缓存，保证数据一致性。
+
+### 总结
+1. `eviction` 控制缓存满时的淘汰规则（默认 LRU 更通用）；
+2. `flushInterval` 控制缓存自动刷新时间（按需设置，避免数据过期）；
+3. `size` 控制缓存最大容量（适中即可，避免内存溢出）；
+4. `readOnly` 控制缓存对象是否可写（推荐 `true`，性能高且安全）；
+5. 二级缓存核心价值是“读多写少”场景提升查询性能，需结合业务选择是否开启。
+
+读取顺序：二级缓存 => 一级缓存 => 数据库
+![img.png](img/img.png)
+
+
+## 那么如何通过注解控制缓存机制呢？
+```java
+@CacheNamespace(readWrite = false)
+public interface MyMapper {
+
+    @Select("select * from student")
+    @Options(useCache = false)
+    List<Student> getAllStudent();
+```
+
+使用@CacheNamespace注解直接定义在接口上即可，然后我们可以通过使用@Options来控制单个操作的缓存启用。
+
+
+## 动态代理复习
+
+https://liaoxuefeng.com/books/java/reflection/proxy/index.html
+
+https://www.bilibili.com/video/BV1hkzwY8E5R?spm_id_from=333.788.videopod.sections&vd_source=4fd29620ab97a080af7ee392e19b0fcb
 
