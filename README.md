@@ -1594,3 +1594,10 @@ https://liaoxuefeng.com/books/java/reflection/proxy/index.html
 
 https://www.bilibili.com/video/BV1hkzwY8E5R?spm_id_from=333.788.videopod.sections&vd_source=4fd29620ab97a080af7ee392e19b0fcb
 
+
+
+## JUL 日志系统
+
+使用Lombok快速开启日志
+@Log
+
